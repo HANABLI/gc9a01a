@@ -24,14 +24,11 @@ extern SPI_HandleTypeDef GC9A01A_SPI;
 static volatile uint8_t tx_busy = 0;
 #endif
 
-#ifndef _swap_int16_t
-#    define _swap_int16_t(a, b) \
-        {                       \
-            int16_t t = a;      \
-            a = b;              \
-            b = t;              \
-        }
-#endif
+static inline void swap_int16_t(int16_t *a, int16_t *b) {
+    int16_t t = *a;
+    *a = *b;
+    *b = t;
+}
 
 /*Internal GPIO control -----------------------------------------*/
 
@@ -102,8 +99,11 @@ void gc9a01a_set_address_window(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t 
     gc9a01a_write_cmd(GC9A01A_CASET);
     uint8_t column_data[] = {x0 >> 8, x0 & 0xFF, x1 >> 8, x1 & 0xFF};
     gc9a01a_write_data_buf(column_data, 4);
+
+    gc9a01a_write_cmd(GC9A01A_ROW_SET);
     uint8_t row_data[] = {y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF};
-    gc9a01a_write_cmd(GC9A01A_RAMWR);
+    gc9a01a_write_data_buf(row_data, 4);
+    gc9a01a_write_cmd(GC9A01A_RAM_MEM_WR);
 }
 
 void gc9a01a_configure() {
@@ -405,7 +405,7 @@ void gc9a01a_set_orientation(uint8_t orientation) {
     uint8_t params[4] = {0x00, 0x00, 0x00, 0xf0};
     gc9a01a_write_cmd(GC9A01A_CASET);
     gc9a01a_write_data_buf(params, 4);
-    gc9a01a_write_cmd(GC9A01A_RASET);
+    gc9a01a_write_cmd(GC9A01A_ROW_SET);
     gc9a01a_write_data_buf(params, 4);
     if (orientation == LANDSCAPE)
     {
@@ -508,9 +508,9 @@ void gc9a01a_draw_image(int16_t x, int16_t y, int16_t width, int16_t height,
 
     gc9a01a_set_address_window(x, y, x + width - 1, y + height - 1);
 
-    for (uint32_t = 0; i < w * h; i++)
+    for (uint16_t i = 0; i < (width * height); i++)
     {
-        uint8_t color[] = {(image_data[i] >> 8) & 0xFF, image_data[i] & 0xFF};
+        uint8_t color[] = {(image[i] >> 8) & 0xFF, image[i] & 0xFF};
         gc9a01a_write_data_buf(color, sizeof(color));
     }
 #if USE_DMA
@@ -523,14 +523,14 @@ void gc9a01a_draw_line(int16_t x_0, int16_t y_0, int16_t x_1, int16_t y_1, uint1
     int16_t steep = abs(y_1 - y_0) > abs(x_1 - x_0);
     if (steep)
     {
-        _swap_int16_t(x_0, x_1);
-        _swap_int16_t(y_0, y_1);
+        swap_int16_t(&x_0, &x_1);
+        swap_int16_t(&y_0, &y_1);
     }
 
     if (x_0 > x_1)
     {
-        _swap_int16_t(x_0, x_1);
-        _swap_int16_t(y_0, y_1);
+        swap_int16_t(&x_0, &x_1);
+        swap_int16_t(&y_0, &y_1);
     }
 
     int16_t dx, dy;
@@ -575,7 +575,7 @@ void gc9a01a_draw_fast_vertical_line(int16_t x, int16_t y, int16_t height, uint1
 }
 
 void gc9a01a_draw_fast_horizental_line(int16_t x, int16_t y, int16_t width, uint16_t color) {
-    gc9a01a_draw_line(x, y, x + width - 1, y);
+    gc9a01a_draw_line(x, y, x + width - 1, y, color);
 #if USE_DMA
     while (tx_busy)
         ;
@@ -594,7 +594,7 @@ void gc9a01a_draw_rectangle(int16_t x, int16_t y, int16_t width, int16_t height,
 }
 
 void gc9a01a_fill_rectangle(int16_t x, int16_t y, int16_t width, int16_t height, uint16_t color) {
-    for (int16_t i = y + 1, i < height, i++)
+    for (int16_t i = (y + 1); i < height; i++)
     { gc9a01a_draw_fast_horizental_line(x + 1, i, width - 1, color); }
 #if USE_DMA
     while (tx_busy)
@@ -635,20 +635,20 @@ void gc9a01a_draw_circle(int16_t x, int16_t y, int16_t radius, uint16_t color) {
 }
 
 void gc9a01a_fill_circle(int16_t x, int16_t y, int16_t radius, uint16_t color) {
-    if (r < 0)
+    if (radius < 0)
         return;
     // we use midpoint circle algorthm to find the boundary, then draw horizental
     // spans between symmetric points
-    int16_t xd = 0, yd = r;
-    int16_t d = 1 - r;  // midpoint decision variable.
+    int16_t xd = 0, yd = radius;
+    int16_t d = 1 - radius;  // midpoint decision variable.
 
     while (y >= x)
     {
         // For each octant pair, draw the filled horizental spans:
-        gc9a01a_draw_line(x - xd, y + yd, x + xd, y + yd);
-        gc9a01a_draw_line(x - xd, y - yd, x + xd, y - yd);
-        gc9a01a_draw_line(x - yd, y + xd, x + yd, y + xd);
-        gc9a01a_draw_line(x - yd, y - xd, x + yd, y - xd);
+        gc9a01a_draw_line(x - xd, y + yd, x + xd, y + yd, color);
+        gc9a01a_draw_line(x - xd, y - yd, x + xd, y - yd, color);
+        gc9a01a_draw_line(x - yd, y + xd, x + yd, y + xd, color);
+        gc9a01a_draw_line(x - yd, y - xd, x + yd, y - xd, color);
 
         ++xd;
         if (d < 0)
@@ -779,18 +779,18 @@ void gc9a01a_fill_triangle(int16_t x_0, int16_t y_0, int16_t x_1, int16_t y_1, i
     // sort by Y
     if (y_0 > y_1)
     {
-        _swap_int16_t(&y_0, &y_1);
-        _swap_int16_t(&x_0, &x_1);
+        swap_int16_t(&y_0, &y_1);
+        swap_int16_t(&x_0, &x_1);
     }
     if (y_1 > y_2)
     {
-        _swap_int16_t(&y_1, &y_2);
-        _swap_int16_t(&x_1, &x_2);
+        swap_int16_t(&y_1, &y_2);
+        swap_int16_t(&x_1, &x_2);
     }
     if (y_0 > y_1)
     {
-        _swap_int16_t(&y_0, &y_1);
-        _swap_int16_t(&x_0, &x_1);
+        swap_int16_t(&y_0, &y_1);
+        swap_int16_t(&x_0, &x_1);
     }
 
     // Compute slopes
@@ -804,7 +804,7 @@ void gc9a01a_fill_triangle(int16_t x_0, int16_t y_0, int16_t x_1, int16_t y_1, i
     // --- fill top half ---
     for (int16_t y = y_0; y <= y_1; ++y)
     {
-        gc9a01a_draw_fast_horizental_line((int)sx_0, y, (int16_t)(sx_1 - sx_0));
+        gc9a01a_draw_fast_horizental_line((int)sx_0, y, (int16_t)(sx_1 - sx_0), color);
         sx_0 += dx02;
         sx_1 += dx01;
     }
@@ -813,7 +813,7 @@ void gc9a01a_fill_triangle(int16_t x_0, int16_t y_0, int16_t x_1, int16_t y_1, i
     sx_1 += x_1;
     for (int16_t y = y_0; y <= y_1; ++y)
     {
-        gc9a01a_draw_fast_horizental_line((int)sx_0, (int)sx_1, y);
+        gc9a01a_draw_fast_horizental_line((int)sx_0, (int)sx_1, y, color);
         sx_0 += dx02;
         sx_1 += dx12;
     }
@@ -866,23 +866,23 @@ void gc9a01a_draw_round_corner(int16_t x, int16_t y, int16_t r, uint8_t cornerna
         f += ddF_x;
         if (cornername & 0x4)
         {
-            writePixel(x + xc, y + yc, color);
-            writePixel(x + yc, y + xc, color);
+            gc9a01a_write_pixel(x + xc, y + yc, color);
+            gc9a01a_write_pixel(x + yc, y + xc, color);
         }
         if (cornername & 0x2)
         {
-            writePixel(x + xc, y - yc, color);
-            writePixel(x + yc, y - xc, color);
+            gc9a01a_write_pixel(x + xc, y - yc, color);
+            gc9a01a_write_pixel(x + yc, y - xc, color);
         }
         if (cornername & 0x8)
         {
-            writePixel(x - yc, y + xc, color);
-            writePixel(x - xc, y + yc, color);
+            gc9a01a_write_pixel(x - yc, y + xc, color);
+            gc9a01a_write_pixel(x - xc, y + yc, color);
         }
         if (cornername & 0x1)
         {
-            writePixel(x - yc, y - xc, color);
-            writePixel(x - xc, y - yc, color);
+            gc9a01a_write_pixel(x - yc, y - xc, color);
+            gc9a01a_write_pixel(x - xc, y - yc, color);
         }
     }
 #if USE_DMA
@@ -965,13 +965,13 @@ void gc9a01a_fill_screen(uint16_t color) {
 }
 
 // Create an instance of the driver structure with our implementations
-const display_driver_t gc9a01a_driver = {
+const gfx_display_driver_t gc9a01a_driver = {
     .init = gc9a01a_init,
     .write_string = gc9a01a_write_string,
     .write_char = gc9a01a_write_char,
     .draw_image = gc9a01a_draw_image,
     .fill_screen = gc9a01a_fill_screen,
-    .draw_pixel = gc9a01a_draw_pixel,
-    .set_orientation = gc9a01a_set_orientation,
-    .fill_rectangle = gc9a01a_fill_rect,
+    .write_pixel = gc9a01a_write_pixel,
+    .orientation = gc9a01a_set_orientation,
+    .fill_rectangle = gc9a01a_fill_rectangle,
 };

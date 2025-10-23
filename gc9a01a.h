@@ -23,9 +23,12 @@
 #define GC9A01A_H
 
 /* Includes --------------------------------------------------------------- */
-#include <stdint.h>
-#include <stddef.h>
 #include "gfx_display.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+#include "main.h"
 
 #define GC9A01A_TFTWIDTH 240   ///< Display width in pixels
 #define GC9A01A_TFTHEIGHT 240  ///< Display hight in pixels
@@ -44,9 +47,9 @@
 #define GC9A01A_DISP_OFF 0x28     ///< Display OFF
 #define GC9A01A_DISP_ON 0x29      ///< Display ON
 
-#define GC9A01A_CASET 0x2A  ///< Column Address Set
-#define GC9A01A_RASET 0x2B  ///< Row Address Set
-#define GC9A01A_RAMWR 0x2C  ///< Memory Write
+#define GC9A01A_CASET 0x2A       ///< Column Address Set
+#define GC9A01A_ROW_SET 0x2B     ///< Row Address Set
+#define GC9A01A_RAM_MEM_WR 0x2C  ///< Memory Write
 
 #define GC9A01A_PTLAR 0x30    ///< Partial Area
 #define GC9A01A_VSCRDEF 0x33  ///< Vertical Scrolling Definition
@@ -170,4 +173,4 @@ void gc9a01a_fill_round_rectangle(int16_t x_0, int16_t y_0, int16_t width, int16
                                   int16_t radius, uint16_t color);
 void gc9a01a_fill_screen(uint16_t color);
 
-#endif /* GC9A01_H */
+#endif /* GC9A01A_H */
