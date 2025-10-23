@@ -33,7 +33,7 @@ void gfx_display_init(void) {
 void gfx_display_write_string(int16_t x, int16_t y, const char *str, glcd_font_t font,
                               uint16_t color, uint16_t background_color) {
     if (lcd_driver && lcd_driver->write_string)
-    { lcd_driver->write_string(x, y, str, font, color); }
+    { lcd_driver->write_string(x, y, str, font, color, background_color); }
 }
 
 void gfx_display_write_char(int16_t x, int16_t y, const char ch, glcd_font_t font, uint16_t color,
